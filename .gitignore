@@ -2,9 +2,11 @@
 bin
 obj
 
-#Raven data folder
+#Raven data and log folders
 Data
-Log
+Logs
+Tenants
+*.log
 
 # Resharper, User Settings, and other cache files
 *resharper.user
