@@ -5,6 +5,9 @@ using System.Web;
 using System.Web.Mvc;
 using System.Web.Routing;
 using MvcApplication1.Controllers;
+using Raven.Abstractions.Replication;
+using Raven.Bundles.IndexReplication.Data;
+using Raven.Bundles.Versioning.Data;
 using Raven.Client;
 using Raven.Client.Document;
 using Raven.Client.Indexes;
@@ -50,7 +53,35 @@ namespace MvcApplication1
         {
             DocumentStore = new DocumentStore {Url = "http://localhost:8080", DefaultDatabase = "BasicOps"};
             DocumentStore.Initialize();
+            DocumentStore.AggressivelyCacheFor(TimeSpan.FromMinutes(5));
+            DocumentStore.Conventions.FailoverBehavior = FailoverBehavior.AllowReadsFromSecondaries;
             IndexCreation.CreateIndexes(typeof(StudentsByCourse).Assembly, DocumentStore);
+
+            using (var session = DocumentStore.OpenSession())
+            {
+                session.Store(new ReplicationDocument
+                    {
+                        Destinations =
+                            new List<ReplicationDestination>
+                                {new ReplicationDestination {Database = "Slave", Url = "http://localhost:8080"},
+                                new ReplicationDestination {Database = "Slave2", Url = "http://localhost:8080"}}
+                    });
+                session.Store(new VersioningConfiguration
+                    {
+                        Id = "Raven/Versioning/DefaultConfiguration",
+                        Exclude = false,
+                        MaxRevisions = 5
+                    });
+                session.Store(new IndexReplicationDestination
+                    {
+                        Id = "Raven/IndexReplication/ReportTest",
+                        ColumnsMapping = {{"Name", "Name"}, {"Price", "Price"},},
+                        ConnectionStringName = "SQLConnection",
+                        PrimaryKeyColumnName = "Id",
+                        TableName = "Test"
+                    });
+                session.SaveChanges();
+            }
         }
     }
 }
